@@ -1,11 +1,12 @@
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
 #include "pipe_networking.h"
 
-char *WKP = "pk";
+char *WKP = "pkfreeze";
 
 /*=========================
   server_handshake
@@ -19,25 +20,47 @@ char *WKP = "pk";
 int server_handshake(int *to_client)
 {
     char buf[256];
-    int fd = mkfifo(WKP, 0644);
-    if (fd < 0 && errno != EEXIST)
+    int read_end, write_end;
+
+    if (mkfifo(WKP, 0644) < 0 && errno != EEXIST)
     {
-        perror("Failed to create named pipe");
+        perror("Failed to create known named pipe");
+        return -1;
     }
+
     printf("Waiting for connection...\n");
-    fd = open(WKP, O_RDONLY);
-    if (fd < 0)
+    read_end = open(WKP, O_RDONLY);
+    if (read_end < 0)
     {
-        perror("Failed to open the pipe you just created???");
+        perror("Failed to open known named pipe you just created???");
+        return -1;
     }
-    read(fd, buf, 256);
-    if (strncmp(buf, "WhiteAlbum", 10) != 0)
+
+    read(read_end, buf, 256);
+
+    printf("Received message from a client, opening pipe \"%s\"...\n", buf);
+    remove(WKP);
+    write_end = open(buf, O_WRONLY);
+    if (write_end < 0)
     {
-        perror("Received bad message, handshake aborted");
+        perror("Could not open pipe, handshake aborted");
+        return -1;
     }
-    printf("Received message from client, sending message\n");
-    write(fd, "weeps", 5);
-    return 0;
+
+    printf("Communication established, sending message to client...\n");
+    write(write_end, "WhiteAlbum", 10);
+
+    printf("Waiting for response from client...\n");
+    read(read_end, buf, 256);
+    if (strncmp(buf, "WeepsGently", 11) != 0)
+    {
+        printf("Unknown message received, aborting handshake.\n");
+        return -1;
+    }
+    printf("Handshake successful!\n");
+
+    *to_client = write_end;
+    return read_end;
 }
 
 
@@ -52,17 +75,43 @@ int server_handshake(int *to_client)
   =========================*/
 int client_handshake(int *to_server)
 {
-    int fd = mkfifo("fire", 0644);
-    if (fd < 0 && errno != EEXIST)
+    char buf[255];
+    char *pipename = "pkfire";
+    int read_end, write_end;
+    if (mkfifo(pipename, 0644) < 0 && errno != EEXIST)
     {
         perror("Failed to create named pipe");
+        return -1;
     }
 
-    fd = open(WKP, O_WRONLY);
-    if (fd < 0)
+    printf("Attempting connection, sending private pipe name to server...\n");
+    write_end = open(WKP, O_WRONLY);
+    if (write_end < 0)
     {
         perror("Failed open the server's pipe");
+        return -1;
     }
-    write(fd, "WhiteAlbum", 10);
-    return 0;
+    write(write_end, pipename, strlen(pipename) + 1);
+
+    read_end = open(pipename, O_RDONLY);
+    if (read_end < 0)
+    {
+        perror("Failed to open known named pipe you just created???");
+        return -1;
+    }
+
+    printf("Waiting for response from server...\n");
+    read(read_end, buf, 10);
+    if (strncmp(buf, "WhiteAlbum", 10) != 0)
+    {
+        printf("Unknown message received, aborting handshake.");
+        return -1;
+    }
+
+    printf("Received response from server, sending response...\n");
+    remove(pipename);
+    write(write_end, "WeepsGently", 11);
+
+    *to_server = write_end;
+    return read_end;
 }
