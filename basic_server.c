@@ -16,7 +16,19 @@ void sighandler(int s)
         case SIGPIPE:
             close(to_client);
             printf("Client disconnected.\n");
-            from_client = -1;
+            exit(0);
+    }
+}
+
+void process_input()
+{
+    char buf[256];
+    for (;;)
+    {
+        memset(buf, 0, 256);
+        read(from_client, buf, 256);
+        sprintf(buf, "Length of string: %ld\n", strlen(buf));
+        write(to_client, buf, 256);
     }
 }
 
@@ -24,8 +36,7 @@ int main()
 {
     signal(SIGINT, sighandler);
     signal(SIGPIPE, sighandler);
-    char buf[256];
-    int temp;
+    int pid;
 
     for (;;)
     {
@@ -33,9 +44,16 @@ int main()
         {
             from_client = server_handshake(&to_client);
         }
-        memset(buf, 0, 256);
-        read(from_client, buf, 256);
-        sprintf(buf, "Length of string: %ld\n", strlen(buf));
-        write(to_client, buf, 256);
+        pid = fork();
+        if (pid == 0)
+        {
+            /* Child process */
+            process_input();
+        }
+        else
+        {
+            /* Parent process */
+            from_client = -1;
+        }
     }
 }

@@ -42,6 +42,7 @@ int main()
         memset(buf, 0, 256);
         printf("Enter message to send:\n");
         read(STDIN_FILENO, buf, 256);
+        buf[255] = 0;
         buf[strlen(buf) - 1] = 0;
         write(to_server, buf, 256);
         read(from_server, buf, 256);
