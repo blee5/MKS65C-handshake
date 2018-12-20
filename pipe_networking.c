@@ -52,7 +52,7 @@ int server_handshake(int *to_client)
 
     printf("Waiting for response from client...\n");
     read(read_end, buf, 256);
-    if (strncmp(buf, "WeepsGently", 11) != 0)
+    if (strncmp(buf, "GentlyWeeps", 11) != 0)
     {
         printf("Unknown message received, aborting handshake.\n");
         return -1;
@@ -110,7 +110,7 @@ int client_handshake(int *to_server)
 
     printf("Received response from server, sending response...\n");
     remove(pipename);
-    write(write_end, "WeepsGently", 11);
+    write(write_end, "GentlyWeeps", 11);
 
     *to_server = write_end;
     return read_end;
